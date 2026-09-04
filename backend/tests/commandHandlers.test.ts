@@ -36,39 +36,50 @@ describe('Command side validation & handlers', () => {
 
   test('createWatchlist + addAssetToWatchlist end-to-end happy path', () => {
     const wl = createWatchlist('user-cmd-1', 'Test List');
-    const asset = addAssetToWatchlist(wl.id, 'reliance');
+    const asset = addAssetToWatchlist(wl.id, 'reliance', 'user-cmd-1');
     expect(asset.symbol).toBe('RELIANCE');
     expect(asset.watchlistId).toBe(wl.id);
   });
 
   test('addAssetToWatchlist throws for an unknown watchlist', () => {
-    expect(() => addAssetToWatchlist('non-existent-id', 'TCS')).toThrow(/not found/i);
+    expect(() => addAssetToWatchlist('non-existent-id', 'TCS', 'user-cmd-1')).toThrow(/not found/i);
+  });
+
+  test('addAssetToWatchlist throws when the watchlist belongs to another user', () => {
+    const wl = createWatchlist('user-cmd-owner', 'Owned List');
+    expect(() => addAssetToWatchlist(wl.id, 'TCS', 'user-cmd-intruder')).toThrow(/not found/i);
   });
 
   test('removeAssetFromWatchlist throws if asset does not belong to the watchlist', () => {
     const wl1 = createWatchlist('user-cmd-2', 'List A');
     const wl2 = createWatchlist('user-cmd-2', 'List B');
-    const asset = addAssetToWatchlist(wl1.id, 'INFY');
-    expect(() => removeAssetFromWatchlist(wl2.id, asset.id)).toThrow(/not found/i);
+    const asset = addAssetToWatchlist(wl1.id, 'INFY', 'user-cmd-2');
+    expect(() => removeAssetFromWatchlist(wl2.id, asset.id, 'user-cmd-2')).toThrow(/not found/i);
   });
 
   test('setAssetAlertTrigger rejects an invalid direction', () => {
     const wl = createWatchlist('user-cmd-3', 'List C');
-    const asset = addAssetToWatchlist(wl.id, 'SBIN');
-    expect(() => setAssetAlertTrigger(asset.id, 900, 'sideways' as any)).toThrow(/direction/i);
+    const asset = addAssetToWatchlist(wl.id, 'SBIN', 'user-cmd-3');
+    expect(() => setAssetAlertTrigger(asset.id, 900, 'sideways' as any, 'user-cmd-3')).toThrow(/direction/i);
+  });
+
+  test('setAssetAlertTrigger throws when the asset\'s watchlist belongs to another user', () => {
+    const wl = createWatchlist('user-cmd-owner2', 'List D');
+    const asset = addAssetToWatchlist(wl.id, 'ITC', 'user-cmd-owner2');
+    expect(() => setAssetAlertTrigger(asset.id, 900, 'above', 'user-cmd-intruder')).toThrow(/not found/i);
   });
 
   test('setAssetAlertTrigger sanitizes invalid target prices', () => {
     const wl = createWatchlist('user-cmd-4', 'List D');
-    const asset = addAssetToWatchlist(wl.id, 'ITC');
-    expect(() => setAssetAlertTrigger(asset.id, -100, 'above')).toThrow();
-    expect(() => setAssetAlertTrigger(asset.id, 'not-a-number', 'above')).toThrow();
+    const asset = addAssetToWatchlist(wl.id, 'ITC', 'user-cmd-4');
+    expect(() => setAssetAlertTrigger(asset.id, -100, 'above', 'user-cmd-4')).toThrow();
+    expect(() => setAssetAlertTrigger(asset.id, 'not-a-number', 'above', 'user-cmd-4')).toThrow();
   });
 
   test('setAssetAlertTrigger succeeds with a valid positive target price', () => {
     const wl = createWatchlist('user-cmd-5', 'List E');
-    const asset = addAssetToWatchlist(wl.id, 'WIPRO');
-    const trigger = setAssetAlertTrigger(asset.id, 550, 'above');
+    const asset = addAssetToWatchlist(wl.id, 'WIPRO', 'user-cmd-5');
+    const trigger = setAssetAlertTrigger(asset.id, 550, 'above', 'user-cmd-5');
     expect(trigger.targetPrice).toBe(550);
     expect(trigger.direction).toBe('above');
     expect(trigger.active).toBe(true);

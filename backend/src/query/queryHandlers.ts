@@ -7,9 +7,11 @@ import { DenormalizedWatchlist, UserSnapshot } from '../types';
  * Batches asset lookups instead of issuing per-item DB calls.
  */
 
-export function getWatchlistView(watchlistId: string): DenormalizedWatchlist {
+export function getWatchlistView(watchlistId: string, userId: string): DenormalizedWatchlist {
   const watchlist = writeDb.getWatchlist(watchlistId);
-  if (!watchlist) throw new Error('Watchlist not found');
+  // Treat "not found" and "not yours" identically so ID enumeration can't
+  // be used to distinguish existing-but-forbidden watchlists from missing ones.
+  if (!watchlist || watchlist.userId !== userId) throw new Error('Watchlist not found');
 
   const assets = writeDb.listAssetsForWatchlist(watchlistId);
   const ids = assets.map((a) => a.id);
@@ -28,7 +30,7 @@ export function getWatchlistView(watchlistId: string): DenormalizedWatchlist {
 }
 
 export function listUserWatchlists(userId: string) {
-  return writeDb.listWatchlistsForUser(userId).map((wl) => getWatchlistView(wl.id));
+  return writeDb.listWatchlistsForUser(userId).map((wl) => getWatchlistView(wl.id, userId));
 }
 
 /**
@@ -37,7 +39,7 @@ export function listUserWatchlists(userId: string) {
  */
 export function computeWhileYouWereAway(userId: string, watchlistId: string) {
   const snapshot: UserSnapshot | undefined = readCache.getUserSnapshot(userId);
-  const view = getWatchlistView(watchlistId);
+  const view = getWatchlistView(watchlistId, userId);
 
   return view.assets.map((asset) => {
     let basisPrice: number;
@@ -72,7 +74,7 @@ export function computeWhileYouWereAway(userId: string, watchlistId: string) {
 }
 
 export function saveSessionSnapshot(userId: string, watchlistId: string) {
-  const view = getWatchlistView(watchlistId);
+  const view = getWatchlistView(watchlistId, userId);
   const snapshot: UserSnapshot = {
     userId,
     savedAt: Date.now(),

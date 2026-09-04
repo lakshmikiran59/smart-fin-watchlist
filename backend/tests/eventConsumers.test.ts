@@ -16,7 +16,7 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
 describe('CQRS Query-side event consumers (Highlight Engine)', () => {
   test('AssetAddedToWatchlist seeds the read cache (Command -> Query sync)', async () => {
     const wl = createWatchlist('user-evt-1', 'Highlight List');
-    const asset = addAssetToWatchlist(wl.id, 'RELIANCE');
+    const asset = addAssetToWatchlist(wl.id, 'RELIANCE', 'user-evt-1');
     await flush();
     const cached = readCache.getAsset(asset.id);
     expect(cached).toBeDefined();
@@ -25,7 +25,7 @@ describe('CQRS Query-side event consumers (Highlight Engine)', () => {
 
   test('detects a volatility spike (+/-2%) from a single tick', async () => {
     const wl = createWatchlist('user-evt-2', 'Vol List');
-    const asset = addAssetToWatchlist(wl.id, 'TCS');
+    const asset = addAssetToWatchlist(wl.id, 'TCS', 'user-evt-2');
     await flush();
 
     // Establish a baseline price first
@@ -46,7 +46,7 @@ describe('CQRS Query-side event consumers (Highlight Engine)', () => {
 
   test('does not flag a volatility spike for a sub-2% move', async () => {
     const wl = createWatchlist('user-evt-3', 'Small Move List');
-    const asset = addAssetToWatchlist(wl.id, 'HDFCBANK');
+    const asset = addAssetToWatchlist(wl.id, 'HDFCBANK', 'user-evt-3');
     await flush();
 
     eventBus.publish(DomainEvents.MarketTickReceived, { symbol: 'HDFCBANK', price: 1680, timestamp: Date.now() });
@@ -64,10 +64,10 @@ describe('CQRS Query-side event consumers (Highlight Engine)', () => {
 
   test('evaluates and breaches a custom trigger asynchronously on the tick stream', async () => {
     const wl = createWatchlist('user-evt-4', 'Trigger List');
-    const asset = addAssetToWatchlist(wl.id, 'ICICIBANK');
+    const asset = addAssetToWatchlist(wl.id, 'ICICIBANK', 'user-evt-4');
     await flush();
 
-    setAssetAlertTrigger(asset.id, 1300, 'above');
+    setAssetAlertTrigger(asset.id, 1300, 'above', 'user-evt-4');
     await flush();
 
     eventBus.publish(DomainEvents.MarketTickReceived, {
@@ -84,7 +84,7 @@ describe('CQRS Query-side event consumers (Highlight Engine)', () => {
 
   test('ignores a stale/out-of-order tick and raises no new events', async () => {
     const wl = createWatchlist('user-evt-5', 'Stale List');
-    const asset = addAssetToWatchlist(wl.id, 'ITC');
+    const asset = addAssetToWatchlist(wl.id, 'ITC', 'user-evt-5');
     await flush();
 
     const now = Date.now();
@@ -103,7 +103,7 @@ describe('CQRS Query-side event consumers (Highlight Engine)', () => {
 
   test('detects a new intraday HIGH_CROSS when the tick exceeds the prior high', async () => {
     const wl = createWatchlist('user-evt-6', 'High List');
-    const asset = addAssetToWatchlist(wl.id, 'BHARTIARTL'); // dailyOpen=dailyHigh=dailyLow seed
+    const asset = addAssetToWatchlist(wl.id, 'BHARTIARTL', 'user-evt-6'); // dailyOpen=dailyHigh=dailyLow seed
     await flush();
 
     const seeded = readCache.getAsset(asset.id)!;
@@ -122,7 +122,7 @@ describe('CQRS Query-side event consumers (Highlight Engine)', () => {
 
   test('detects a new intraday LOW_CROSS when the tick drops below the prior low', async () => {
     const wl = createWatchlist('user-evt-7', 'Low List');
-    const asset = addAssetToWatchlist(wl.id, 'TATAMOTORS');
+    const asset = addAssetToWatchlist(wl.id, 'TATAMOTORS', 'user-evt-7');
     await flush();
 
     const seeded = readCache.getAsset(asset.id)!;
@@ -141,11 +141,11 @@ describe('CQRS Query-side event consumers (Highlight Engine)', () => {
 
   test('AssetRemovedFromWatchlist purges the asset from the read cache', async () => {
     const wl = createWatchlist('user-evt-8', 'Remove List');
-    const asset = addAssetToWatchlist(wl.id, 'WIPRO');
+    const asset = addAssetToWatchlist(wl.id, 'WIPRO', 'user-evt-8');
     await flush();
     expect(readCache.getAsset(asset.id)).toBeDefined();
 
-    removeAssetFromWatchlist(wl.id, asset.id);
+    removeAssetFromWatchlist(wl.id, asset.id, 'user-evt-8');
     await flush();
 
     expect(readCache.getAsset(asset.id)).toBeUndefined();

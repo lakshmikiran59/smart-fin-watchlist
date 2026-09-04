@@ -49,25 +49,27 @@ router.post('/watchlists', authMiddleware, handle((req) => createWatchlist(req.u
 router.post(
   '/watchlists/:id/assets',
   authMiddleware,
-  handle((req) => addAssetToWatchlist(req.params.id, req.body?.symbol))
+  handle((req) => addAssetToWatchlist(req.params.id, req.body?.symbol, req.userId!))
 );
 
 router.delete(
   '/watchlists/:id/assets/:assetId',
   authMiddleware,
-  handle((req) => removeAssetFromWatchlist(req.params.id, req.params.assetId))
+  handle((req) => removeAssetFromWatchlist(req.params.id, req.params.assetId, req.userId!))
 );
 
 router.post(
   '/assets/:assetId/trigger',
   authMiddleware,
-  handle((req) => setAssetAlertTrigger(req.params.assetId, req.body?.targetPrice, req.body?.direction))
+  handle((req) =>
+    setAssetAlertTrigger(req.params.assetId, req.body?.targetPrice, req.body?.direction, req.userId!)
+  )
 );
 
 // ---- Query routes (Reads) ----
 router.get('/watchlists', authMiddleware, handle((req) => listUserWatchlists(req.userId!)));
 
-router.get('/watchlists/:id', authMiddleware, handle((req) => getWatchlistView(req.params.id)));
+router.get('/watchlists/:id', authMiddleware, handle((req) => getWatchlistView(req.params.id, req.userId!)));
 
 router.get(
   '/watchlists/:id/while-away',

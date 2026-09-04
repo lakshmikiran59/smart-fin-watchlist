@@ -23,6 +23,18 @@ export function validatePriceTarget(value: unknown): number {
   return num;
 }
 
+/**
+ * Ownership guard: every mutation must be scoped to the requesting user's
+ * own watchlist. Without this, a valid JWT for user A could read/mutate
+ * user B's watchlist simply by guessing/enumerating IDs (IDOR).
+ */
+function assertWatchlistOwnership(watchlistId: string, userId: string) {
+  const watchlist = writeDb.getWatchlist(watchlistId);
+  if (!watchlist) throw new Error('Watchlist not found');
+  if (watchlist.userId !== userId) throw new Error('Watchlist not found');
+  return watchlist;
+}
+
 export function createWatchlist(userId: string, name: string) {
   if (!name || !name.trim()) throw new Error('Watchlist name is required');
   const wl = writeDb.createWatchlist(userId, name.trim());
@@ -30,18 +42,18 @@ export function createWatchlist(userId: string, name: string) {
   return wl;
 }
 
-export function addAssetToWatchlist(watchlistId: string, symbolRaw: string) {
+export function addAssetToWatchlist(watchlistId: string, symbolRaw: string, userId: string) {
   const symbol = symbolRaw.toUpperCase();
   validateSymbol(symbol);
-  const watchlist = writeDb.getWatchlist(watchlistId);
-  if (!watchlist) throw new Error('Watchlist not found');
+  assertWatchlistOwnership(watchlistId, userId);
   const openPrice = getLastPrice(symbol);
   const asset = writeDb.addAsset(watchlistId, symbol, openPrice);
   eventBus.publish(DomainEvents.AssetAddedToWatchlist, { watchlistId, asset });
   return asset;
 }
 
-export function removeAssetFromWatchlist(watchlistId: string, assetId: string) {
+export function removeAssetFromWatchlist(watchlistId: string, assetId: string, userId: string) {
+  assertWatchlistOwnership(watchlistId, userId);
   const asset = writeDb.getAsset(assetId);
   if (!asset || asset.watchlistId !== watchlistId) throw new Error('Asset not found in watchlist');
   writeDb.removeAsset(assetId);
@@ -49,9 +61,15 @@ export function removeAssetFromWatchlist(watchlistId: string, assetId: string) {
   return { assetId };
 }
 
-export function setAssetAlertTrigger(assetId: string, targetPriceRaw: unknown, direction: 'above' | 'below') {
+export function setAssetAlertTrigger(
+  assetId: string,
+  targetPriceRaw: unknown,
+  direction: 'above' | 'below',
+  userId: string
+) {
   const asset = writeDb.getAsset(assetId);
   if (!asset) throw new Error('Asset not found');
+  assertWatchlistOwnership(asset.watchlistId, userId);
   if (direction !== 'above' && direction !== 'below') throw new Error('Invalid trigger direction');
   const targetPrice = validatePriceTarget(targetPriceRaw);
   const trigger = writeDb.setTrigger(assetId, asset.symbol, targetPrice, direction);
